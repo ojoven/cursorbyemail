@@ -278,6 +278,15 @@ export function beautifyTranscriptToEmailHTML(
 	return renderDocument({ cardsHtml: card, rawFallback });
 }
 
+export function getModeFromPayload(payload) {
+	const hookEvent = payload?.hook_event_name || "";
+	if (hookEvent.toLowerCase().includes("agent")) return "Agent";
+	if (hookEvent.toLowerCase().includes("plan")) return "Plan";
+	if (hookEvent.toLowerCase().includes("debug")) return "Debug";
+	if (hookEvent.toLowerCase().includes("ask")) return "Ask";
+	return "";
+}
+
 export function beautifyPayloadToEmailHTML(
 	payload,
 	{
@@ -292,12 +301,16 @@ export function beautifyPayloadToEmailHTML(
 	const responseText = latestResponse ?? extractLatestResponseFromPayload(payload);
 	const fullTranscript = transcriptText ?? payload?.transcript ?? "";
 	const path = transcriptPath ?? getTranscriptPathFromPayload(payload);
+	const model = payload?.model || "";
+	const mode = getModeFromPayload(payload);
 	const now = new Date().toISOString();
+
+	const metaInfo = [model, mode].filter(Boolean).join(" • ");
 
 	const responseTurns = renderTurns(`assistant:\n${responseText || ""}`);
 	const responseCard = renderCard({
 		title: "Latest response",
-		metaLines: [now],
+		metaLines: [now, metaInfo].filter(Boolean),
 		bodyHtml:
 			responseTurns ||
 			`<div class="turn"><div class="content muted">No latest response.</div></div>`,
@@ -306,7 +319,7 @@ export function beautifyPayloadToEmailHTML(
 	const transcriptTurns = renderTurns(fullTranscript, { truncateAssistant: true });
 	const transcriptCard = renderCard({
 		title: title || "Full transcript",
-		metaLines: [now, path ? `Transcript path: ${path}` : "Transcript path: (missing)"],
+		metaLines: [now, metaInfo, path ? `Transcript path: ${path}` : "Transcript path: (missing)"].filter(Boolean),
 		bodyHtml:
 			transcriptTurns ||
 			`<div class="turn"><div class="content muted">No transcript content.</div></div>`,
