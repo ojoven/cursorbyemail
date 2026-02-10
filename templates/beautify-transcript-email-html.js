@@ -161,7 +161,7 @@ const renderInlineBlocks = (text) => {
 	return blocks.join("\n");
 };
 
-const renderTurns = (transcript) => {
+const renderTurns = (transcript, { truncateAssistant = false } = {}) => {
 	const src = normalizeNewlines(transcript);
 	const turns = splitTurns(src);
 
@@ -169,11 +169,18 @@ const renderTurns = (transcript) => {
 		.filter((t) => t.text && t.text.length)
 		.map((t) => {
 			const roleClass = t.role === "user" ? "user" : "assistant";
+			let displayText = t.text;
+
+			// Truncate assistant blocks in full transcript to avoid lengthy emails
+			if (truncateAssistant && t.role === "assistant" && displayText.length > 200) {
+				displayText = displayText.slice(0, 200) + "...";
+			}
+
 			return `
 		  <div class="turn">
 			<span class="role ${roleClass}">${esc(t.role)}</span>
 			<div class="content">
-			  ${renderInlineBlocks(t.text)}
+			  ${renderInlineBlocks(displayText)}
 			</div>
 		  </div>
 		`.trim();
@@ -242,7 +249,7 @@ export function beautifyTranscriptToEmailHTML(
 	transcript,
 	{
 		title = "Agent transcript",
-		includeRawFallback = true,
+		includeRawFallback = false,
 		maxRawFallbackChars = 15000,
 	} = {}
 ) {
@@ -262,9 +269,8 @@ export function beautifyTranscriptToEmailHTML(
 			? `
 		  <div class="raw">
 			<h2>Raw transcript (truncated)</h2>
-			<pre>${esc(src.slice(0, maxRawFallbackChars))}${
-				src.length > maxRawFallbackChars ? "\n...(truncated)" : ""
-			}</pre>
+			<pre>${esc(src.slice(0, maxRawFallbackChars))}${src.length > maxRawFallbackChars ? "\n...(truncated)" : ""
+				}</pre>
 		  </div>
 		`.trim()
 			: "";
@@ -276,7 +282,7 @@ export function beautifyPayloadToEmailHTML(
 	payload,
 	{
 		title = "Cursor agent finished",
-		includeRawFallback = true,
+		includeRawFallback = false,
 		maxRawFallbackChars = 15000,
 		transcriptText = "",
 		latestResponse,
@@ -297,7 +303,7 @@ export function beautifyPayloadToEmailHTML(
 			`<div class="turn"><div class="content muted">No latest response.</div></div>`,
 	});
 
-	const transcriptTurns = renderTurns(fullTranscript);
+	const transcriptTurns = renderTurns(fullTranscript, { truncateAssistant: true });
 	const transcriptCard = renderCard({
 		title: title || "Full transcript",
 		metaLines: [now, path ? `Transcript path: ${path}` : "Transcript path: (missing)"],
@@ -311,9 +317,8 @@ export function beautifyPayloadToEmailHTML(
 			? `
 		  <div class="raw">
 			<h2>Raw transcript (truncated)</h2>
-			<pre>${esc(fullTranscript.slice(0, maxRawFallbackChars))}${
-				fullTranscript.length > maxRawFallbackChars ? "\n...(truncated)" : ""
-			}</pre>
+			<pre>${esc(fullTranscript.slice(0, maxRawFallbackChars))}${fullTranscript.length > maxRawFallbackChars ? "\n...(truncated)" : ""
+				}</pre>
 		  </div>
 		`.trim()
 			: "";
