@@ -2,11 +2,27 @@ import "dotenv/config";
 import { Resend } from "resend";
 import fs from "node:fs";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import {
 	beautifyPayloadToEmailHTML,
 	extractLatestResponseFromPayload,
 	getTranscriptPathFromPayload,
 } from "./beautify-transcript-email-html.js";
+
+function getProjectName(cwd = process.cwd()) {
+	try {
+		const top = execSync("git rev-parse --show-toplevel", {
+			cwd,
+			stdio: ["ignore", "pipe", "ignore"],
+		})
+			.toString()
+			.trim();
+		if (top) return path.basename(top);
+	} catch {
+		// not a git repo or git not available
+	}
+	return path.basename(cwd);
+}
 
 const LOG_FILE = process.env.CURSOR_HOOK_LOG_FILE || ".cursor/hooks/hook.log";
 const DEBUG = process.env.CURSOR_HOOK_DEBUG === "1";
@@ -73,16 +89,18 @@ async function main() {
 		process.exit(1);
 	}
 
+	const projectName = getProjectName();
+	const projectPrefix = projectName ? `[${projectName}] ` : "";
 	const baseSubject = process.env.CURSOR_EMAIL_SUBJECT ?? "Cursor agent finished";
 	const conversationId = payload?.conversation_id || payload?.conversationId || "";
 	const subject = conversationId
-		? `${baseSubject} [${conversationId}]`
-		: baseSubject;
+		? `${projectPrefix}${baseSubject} [${conversationId}]`
+		: `${projectPrefix}${baseSubject}`;
 	const text = extractLatestResponseFromPayload(payload, raw || "(empty hook payload)");
 	const transcriptPath = getTranscriptPathFromPayload(payload);
 	const transcriptText = readTranscriptFile(transcriptPath);
 	const html = beautifyPayloadToEmailHTML(payload, {
-		title: "Full transcript",
+		title: `${projectPrefix}Full transcript`,
 		transcriptText,
 		latestResponse: text,
 		transcriptPath,
